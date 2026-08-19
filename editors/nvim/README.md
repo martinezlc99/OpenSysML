@@ -82,3 +82,6 @@ cannot drift from the lexer:
 make nvim-syntax       # regenerate
 go test ./editors/...  # fails if the committed files are stale
 ```
+
+The same run drives a headless-Neovim smoke test (`tests/`) when `nvim` 0.10+
+is on `PATH`; `OPENSYSML_REQUIRE_NVIM=1` fails instead of skipping.
