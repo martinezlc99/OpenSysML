@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Open-MBEE/OpenSysML/editors/internal/keywords"
 	"github.com/Open-MBEE/OpenSysML/internal/core/lexer"
 	"github.com/Open-MBEE/OpenSysML/internal/core/source"
 )
@@ -30,76 +31,15 @@ func Grammars() []Grammar {
 	}
 }
 
-// Keyword groups, each mapped to a TextMate scope. Every keyword the lexer
-// knows is highlighted; grouping only refines the colour it gets, and a group
-// naming a keyword the lexer dropped is a generation error.
-var keywordGroups = []struct {
-	rule     string
-	scope    string
-	keywords []string
-}{
-	{
-		rule:  "keywords-declaration",
-		scope: "keyword.declaration",
-		keywords: []string{
-			"action", "allocation", "analysis", "assoc", "attribute", "behavior",
-			"binding", "calc", "case", "class", "classifier", "comment", "concern",
-			"connection", "connector", "constraint", "datatype", "def", "dependency",
-			"doc", "enum", "event", "expr", "feature", "flow", "function", "interaction",
-			"interface", "item", "language", "metaclass", "metadata", "multiplicity",
-			"namespace", "occurrence", "package", "part", "port", "predicate",
-			"rendering", "rep", "requirement", "state", "step", "struct", "type",
-			"verification", "view", "viewpoint",
-		},
-	},
-	{
-		rule:  "keywords-control",
-		scope: "keyword.control",
-		keywords: []string{
-			// The words our state notation adds (`initial`, `done`) are not
-			// here: the lexer does not reserve them, so they are in "keywords-contextual".
-			"accept", "after", "assert", "assign", "at", "decide",
-			"do", "else", "entry", "exhibit", "exit", "first",
-			"for", "fork", "if", "include", "join",
-			"loop", "merge", "parallel", "perform", "render", "require",
-			"return", "satisfy", "send", "succession", "terminate", "then",
-			"to", "transition", "until", "via", "when", "while",
-		},
-	},
-	{
-		rule:  "keywords-modifier",
-		scope: "storage.modifier",
-		keywords: []string{
-			"abstract", "all", "composite", "const", "constant", "default", "derived",
-			"end", "in", "individual", "inout", "library", "member", "new",
-			"nonunique", "ordered", "out", "portion", "private", "protected", "public",
-			"ref", "snapshot", "standard", "timeslice", "variant", "variation",
-		},
-	},
-	{
-		rule:  "keywords-relationship",
-		scope: "keyword.other.relationship",
-		keywords: []string{
-			"alias", "conjugate", "conjugates", "conjugation", "crosses", "differences",
-			"disjoining", "disjoint", "featured", "featuring", "import", "inverse",
-			"inverting", "intersects", "redefines", "redefinition", "references",
-			"specialization", "specializes", "subclassifier", "subset", "subsets",
-			"subtype", "typed", "typing", "unions",
-		},
-	},
-	{
-		rule:  "keywords-operator",
-		scope: "keyword.operator.word",
-		keywords: []string{
-			"and", "as", "chains", "defined", "hastype", "implies", "istype", "meta",
-			"not", "or", "xor",
-		},
-	},
-	{
-		rule:     "constants",
-		scope:    "constant.language",
-		keywords: []string{"false", "null", "true"},
-	},
+// keywordScopes maps a shared keyword group to its rule name and TextMate
+// scope; a group the map misses fails generation.
+var keywordScopes = map[string]struct{ rule, scope string }{
+	"declaration":  {"keywords-declaration", "keyword.declaration"},
+	"control":      {"keywords-control", "keyword.control"},
+	"modifier":     {"keywords-modifier", "storage.modifier"},
+	"relationship": {"keywords-relationship", "keyword.other.relationship"},
+	"operator":     {"keywords-operator", "keyword.operator.word"},
+	"constant":     {"constants", "constant.language"},
 }
 
 // ruleOrder is the order the grammar applies its rules in: comments and quoted
@@ -280,36 +220,28 @@ func repository(kind source.Kind) (map[string]pattern, error) {
 		},
 	}
 
-	known := map[string]bool{}
-	for _, kw := range lexer.Keywords() {
-		known[kw] = true
+	groups, rest, err := keywords.Partition()
+	if err != nil {
+		return nil, err
 	}
-	grouped := map[string]bool{}
-	for _, group := range keywordGroups {
-		for _, kw := range group.keywords {
-			if !known[kw] {
-				return nil, fmt.Errorf("grammar group %q names %q, which the lexer no longer knows", group.rule, kw)
-			}
-			if grouped[kw] {
-				return nil, fmt.Errorf("keyword %q appears in more than one grammar group", kw)
-			}
-			grouped[kw] = true
+	for _, group := range groups {
+		target, ok := keywordScopes[group.Name]
+		if !ok {
+			return nil, fmt.Errorf("keyword group %q has no TextMate scope", group.Name)
 		}
-		repo[group.rule] = pattern{Name: group.scope, Match: alternation(group.keywords)}
+		repo[target.rule] = pattern{Name: target.scope, Match: alternation(group.Keywords)}
 	}
 
 	// Anything the lexer knows and no group claims still highlights as a
 	// keyword, so a new keyword needs no grammar change.
-	var rest []string
-	for _, kw := range lexer.Keywords() {
-		if !grouped[kw] {
-			rest = append(rest, kw)
-		}
-	}
 	if len(rest) > 0 {
 		repo["keywords-other"] = pattern{Name: "keyword.other", Match: alternation(rest)}
 	}
 
+	known := map[string]bool{}
+	for _, kw := range lexer.Keywords() {
+		known[kw] = true
+	}
 	// The words the parser reads as syntax positionally without the lexer
 	// reserving them. Last of the keyword rules, so a word an earlier rule
 	// claims keeps its own scope, and a generation error if one is reserved:
