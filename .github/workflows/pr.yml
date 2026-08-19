@@ -23,6 +23,9 @@ env:
   # z3 is installed below, so "no solver, therefore skip" would exercise nothing:
   # this turns an absent solver into a failure (see internal/core/solve).
   OPENSYSML_REQUIRE_SMT: "1"
+  # neovim is installed below: this turns an absent nvim into a failure instead
+  # of a skip (see editors/nvim/tests).
+  OPENSYSML_REQUIRE_NVIM: "1"
 
 jobs:
   # Which areas the pull request touches. A path no area claims turns every area
@@ -110,6 +113,18 @@ jobs:
           unzip -p /tmp/cvc5.zip '*/bin/cvc5' > /tmp/cvc5-bin
           sudo install -m 0755 /tmp/cvc5-bin /usr/local/bin/cvc5
           cvc5 --version | head -1
+
+      # apt's neovim is older than the plugin's 0.10 floor, so the official
+      # release is what CI runs, pinned by digest; without it the nvim smoke
+      # test would skip (see editors/nvim/tests).
+      - name: Install neovim
+        run: |
+          curl -fsSL -o /tmp/nvim.tar.gz \
+            https://github.com/neovim/neovim/releases/download/v0.12.4/nvim-linux-x86_64.tar.gz
+          echo "012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628  /tmp/nvim.tar.gz" | sha256sum --check --strict
+          sudo tar -xzf /tmp/nvim.tar.gz -C /opt
+          sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+          nvim --version | head -1
 
       # Keyed on the download script and the shared pilot pin, so a change to the
       # pinned tag or the layout invalidates the cache. A restored cache is still

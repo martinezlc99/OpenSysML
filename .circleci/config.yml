@@ -65,6 +65,19 @@ jobs:
             sudo install -m 0755 /tmp/cvc5-bin /usr/local/bin/cvc5
             cvc5 --version | head -1
 
+      # apt's neovim is older than the plugin's 0.10 floor, so the official
+      # release is what CI runs, pinned by digest; without it the nvim smoke
+      # test would skip (see editors/nvim/tests).
+      - run:
+          name: Install neovim
+          command: |
+            curl -fsSL -o /tmp/nvim.tar.gz \
+              https://github.com/neovim/neovim/releases/download/v0.12.4/nvim-linux-x86_64.tar.gz
+            echo "012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628  /tmp/nvim.tar.gz" | sha256sum --check --strict
+            sudo tar -xzf /tmp/nvim.tar.gz -C /opt
+            sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+            nvim --version | head -1
+
       - run:
           name: Check Go formatting
           command: |
@@ -183,6 +196,8 @@ jobs:
             OPENSYSML_REQUIRE_PILOT_CORPORA: "1"
             # Same for the solver installed above: absent means failure, not skip.
             OPENSYSML_REQUIRE_SMT: "1"
+            # Same for neovim: absent means the smoke test fails, not skips.
+            OPENSYSML_REQUIRE_NVIM: "1"
 
       # The corpora gate alone, so its per-root verdict lines are legible in the
       # log and a skip cannot hide behind a green suite.
