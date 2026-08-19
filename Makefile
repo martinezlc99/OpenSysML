@@ -1,4 +1,4 @@
-.PHONY: all build build-sysml build-lsp build-grpc conformance conformance-pkg conformance-rust test lint clean install help python-test python-install proto proto-buf python-proto proto-ts proto-rust proto-lint proto-breaking vscode-grammar vscode-build vscode-package docs docs-install docs-serve docs-counts docs-check
+.PHONY: all build build-sysml build-lsp build-grpc conformance conformance-pkg conformance-rust test lint clean install help python-test python-install proto proto-buf python-proto proto-ts proto-rust proto-lint proto-breaking vscode-grammar vscode-build vscode-package nvim-syntax docs docs-install docs-serve docs-counts docs-check
 
 # Version information
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -27,6 +27,7 @@ BUF_BREAKING_AGAINST ?= .git\#ref=origin/main,subdir=api/proto
 BIN_DIR := bin
 PYTHON_DIR := python
 VSCODE_DIR := editors/vscode
+NVIM_DIR := editors/nvim
 PYTHON ?= python3
 # buf.gen.python.yaml starts the interpreter this names.
 export PYTHON
@@ -189,6 +190,10 @@ docs: ## Build the documentation site, failing on a broken link
 
 docs-serve: ## Serve the documentation site with live reload
 	$(PYTHON) -m mkdocs serve --strict
+nvim-syntax: ## Regenerate the Neovim syntax files from the lexer keywords
+	@echo "Generating Vim syntax files..."
+	go run ./$(NVIM_DIR)/tools/gensyntax -out $(NVIM_DIR)/syntax
+	@echo "✓ Syntax files generated"
 
 help: ## Show this help message
 	@echo "Available targets:"
